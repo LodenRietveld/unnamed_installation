@@ -70,6 +70,7 @@ dna.generate_visualizer_osc_string() => string visualizer_string;
 
 
 Event arpeggio_switch_event;
+float arpeggio_spread;
 
 Float @ filter_range[iod.num_osc];
 Event filter_update_lock[iod.num_osc];
@@ -171,12 +172,12 @@ fun void apply_dna_change_and_mutate_other(){
 	0 => total_env_time;
 
 	for (int i; i < dna.number_of_parameters; i++){
-		dna.get(i) => float val;
+		dna.get_scaled(i) => float scaled;
 		if (i < dna.FILTER_FREQ){
-			val +=> total_env_time;
+			scaled +=> total_env_time;
 		}
-		apply_dna(i, val);
-		osc_target.addFloat(val);
+		apply_dna(i, scaled);
+		osc_target.addFloat(dna.get(i));
 	}
 
 	osc_target.addInt(0);
@@ -217,6 +218,8 @@ fun void apply_dna(int index, float value){
 		}
 	} else if (index == dna.NOISE_FM_AMT){
 		value => noise_amt;
+	} else if (index == dna.ARPEGGIO_SPREAD){
+		value => arpeggio_spread;
 	}
 }
 
@@ -283,17 +286,20 @@ fun void switch_arpeggiating(){
 fun void arpeggiate(){
 	while(1){
 		if (iod.arpeggiating){
+			arpeggio_spread * iod.num_notes => float total_arp_spread;
 			for (int i; i < iod.num_notes; i++){
 				env[i].keyOn();
+				arpeggio_spread::ms => now;
 			}
 
-			dna.get(dna.ATTACK)::ms => now;
+			pos(dna.get(dna.ATTACK) - total_arp_spread)::ms => now;
 
 			for (int i; i < iod.num_notes; i++){
-				env[i].keyOn();
+				env[i].keyOff();
+				arpeggio_spread::ms => now;
 			}
 
-			dna.get(dna.RELEASE)::ms => now;
+			pos(dna.get(dna.RELEASE) - total_arp_spread)::ms => now;
 		} else {
 			arpeggio_switch_event => now;
 		}
@@ -340,9 +346,9 @@ fun void handle_env_msg(){
 		}
 
 		if (note_on) {
-			if (Math.random2f(0., 1.) > 0.015){
+			if (Math.random2f(0., 1.) < 0.015){
 
-				/* switch_arpeggiating(); */
+				switch_arpeggiating();
 			}
 		}
 
@@ -357,7 +363,7 @@ fun int[] unique_random_order(int length, int array[]){
     {
         for (int i; i < length - 1; i++)
         {
-          (i + Math.random() / ((Math.pow(2, 32) / 2) / (length - i) + 1)) $ int => int j;
+          (i + Math.random() / (Math.RANDOM_MAX / (length - i) + 1)) $ int => int j;
           array[j] => int t;
           array[i] => array[j];
           t => array[i];
@@ -428,7 +434,7 @@ fun void dna_to_visualizer(){
 			visualizer.startMsg(visualizer_string);
 			visualizer.addInt(iod.index);
 
-			dna.get_normalized_array() @=> norm_dna;
+			dna.get_normalized_scaled_array() @=> norm_dna;
 
 			for (int i; i < dna.number_of_parameters; i++){
 				visualizer.addFloat(norm_dna[i]);
@@ -553,6 +559,14 @@ fun void set_notes(int notes[], SqrOsc @oscs[]){
 fun void start_envs(){
 	for (0 => int i; i < iod.num_osc; i++){
 		1 => env[i].keyOn;
+	}
+}
+
+fun float pos(float in){
+	if (in < 0.){
+		return 0.;
+	} else {
+		return in;
 	}
 }
 

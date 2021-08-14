@@ -1,13 +1,39 @@
 public class GenerationalDataPoint {
     Float value;
     Vector bounds;
-    int paramater_value_curve; //todo
+    ParameterCurve @ p;
+    int has_curve;
     string name;
+
+    fun void init(string name, float min, float max, ParameterCurve @ pc){
+        set_name(name);
+        set_bounds(min, max);
+        set_bound_range();
+        pc @=> p;
+        1 => has_curve;
+    }
 
     fun void init(string name, float min, float max){
         set_name(name);
         set_bounds(min, max);
         set_bound_range();
+        0 => has_curve;
+    }
+
+    fun float get_scaled_value(){
+        if (has_curve){
+            return bounds.x + (bounds.y * p.curve_value(get_normalized()));
+        } else {
+            return value.val;
+        }
+    }
+
+    fun float scale(float in){
+        if (has_curve && in >= 0 && in < 1.){
+            return p.curve_value(in);
+        } else {
+            return in;
+        }
     }
 
     fun float get_value(){

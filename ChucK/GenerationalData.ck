@@ -26,6 +26,7 @@ public class GenerationalData {
 
 	GenerationalDataPoint data[number_of_parameters];
 	float normalized_array[number_of_parameters];
+	float normalized_scaled_array[number_of_parameters];
 
 	set_defaults();
 	initialize_to_random();
@@ -34,6 +35,14 @@ public class GenerationalData {
 	fun float get(int idx){
 		if (idx > -1 && idx < number_of_parameters){
 			return data[idx].get_value();
+		} else {
+			return -999999.;
+		}
+	}
+
+	fun float get_scaled(int idx){
+		if (idx > -1 && idx < number_of_parameters){
+			return data[idx].get_scaled_value();
 		} else {
 			return -999999.;
 		}
@@ -138,11 +147,13 @@ public class GenerationalData {
 
 	fun void update_normalized_array(int i){
 		data[i].get_normalized() => normalized_array[i];
+		data[i].scale(normalized_array[i]) => normalized_scaled_array[i];
 	}
 
 	fun float[] normalize_dna_to_array(){
 		for (int i; i < number_of_parameters; i++){
 			data[i].get_normalized() => normalized_array[i];
+			data[i].scale(normalized_array[i]) => normalized_scaled_array[i];
 		}
 
 		return normalized_array;
@@ -150,6 +161,10 @@ public class GenerationalData {
 
 	fun float[] get_normalized_array(){
 		return normalized_array;
+	}
+
+	fun float[] get_normalized_scaled_array(){
+		return normalized_scaled_array;
 	}
 
 	fun string get_name_typetag(string start){
@@ -174,15 +189,17 @@ public class GenerationalData {
 	fun void set_defaults(){
 		gmd.generate_param_curve(number_of_parameters);
 
-		data[ATTACK].init("Attack", 0., 1000.);
-		data[DECAY].init("Decay", 10., 10000.);
-		data[SUSTAIN].init("Sustain", 0., 1.);
-		data[RELEASE].init("Release", 10., 10000.);
-		data[FILTER_FREQ].init("Filter freq", 100., 15000.);
+		ParabolicCurve curve_adsr;
+
+		data[ATTACK].init("Attack", 0., 1000., curve_adsr);
+		data[DECAY].init("Decay", 10., 10000., curve_adsr);
+		data[SUSTAIN].init("Sustain", 0., 1., curve_adsr);
+		data[RELEASE].init("Release", 10., 10000., curve_adsr);
+		data[FILTER_FREQ].init("Filter freq", 100., 15000., curve_adsr);
 		data[FILTER_ENV_AMT].init("Filter env amt", 0., 1.);
 		data[OSC_WAVEFORM].init("Osc waveform", 0., 1.);
-		data[NOISE_FM_AMT].init("Noise FM amt", 0., .05);
-		data[ARPEGGIO_SPREAD].init("ARPEGGIO_SPREAD", 10., 500.);
+		data[NOISE_FM_AMT].init("Noise FM", 0., .05);
+		data[ARPEGGIO_SPREAD].init("Arp spread", 0., 500.);
 	}
 
 	fun void initialize_to_random(){
