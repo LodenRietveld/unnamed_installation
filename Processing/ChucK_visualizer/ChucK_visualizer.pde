@@ -13,7 +13,9 @@ int num_oscillators = 4;
 int num_values_per_oscillator = 8;
 float section_width;
 
-boolean setup_ints_received = false, setup_names_received = false, setup_processed = false, go_next = false, processing_setup_done = false;
+int ports[];
+
+boolean setup_ints_received = false, setup_names_received = false, setup_ports_received = false, setup_processed = false, go_next = false, processing_setup_done = false;
 
 OscillatorValues vals[] = new OscillatorValues[num_values_per_oscillator];
 String value_names[] = {"Attack", "Decay", "Sustain", "Release", "Filter frequency", "Filter env amt", "Osc waveform", "Noise FM amt"};
@@ -40,11 +42,12 @@ void setup(){
   prepareExitHandler();
   
   processing_setup_done = true;
+  recv_go();
 }
 
 void draw(){
   if (!setup_processed){
-    if (processing_setup_done && (frameCount % 30 == 0 || go_next)){
+    if (processing_setup_done && go_next){
       go_next = false;
       recv_go();
     }
@@ -71,12 +74,14 @@ void oscEvent(OscMessage msg) {
     if (val.equals("ints")){
       setup_ints(msg);
     } else if (val.equals("names")){
-      setup_names(msg); 
+      setup_names(msg);
+    } else if (val.equals("ports")){
+      setup_ports(msg);
     } else if (val.equals("done_ack")){
       println("Complete setup processed");
       setup_processed = true;
     }
-  } else if (msg.checkAddrPattern("/osc")){
+  } else if (msg.checkAddrPattern("/osc") && setup_processed){
     int index = msg.get(0).intValue();
     
     for (int i = 0; i < num_values_per_oscillator; i++){
@@ -97,10 +102,17 @@ boolean recv_go(){
     msg.add("names");
     oscP5.send(msg, first_osc);
     println("Send request for names");
+  } else if (!setup_ports_received){
+    OscMessage msg = new OscMessage("/setup_req");
+    msg.add("ports");
+    oscP5.send(msg, first_osc);
   } else if (setup_ints_received && setup_names_received && !setup_processed){
     OscMessage msg = new OscMessage("/setup_req");
     msg.add("done");
-    oscP5.send(msg, first_osc);
+    
+    for (int i = 0; i < num_oscillators; i++){
+      oscP5.send(msg, new NetAddress("localhost", ports[i]));
+    }
     println("Send setup done");
     return true;
   }
@@ -138,6 +150,18 @@ void setup_names(OscMessage msg){
   go_next = true;
 }
 
+void setup_ports(OscMessage msg){
+  ports = new int[num_oscillators];
+  
+  for (int i = 0; i < num_oscillators; i++){
+    ports[i] = msg.get(i+1).intValue();
+  }
+  
+  println("Received and saved ports");
+  setup_ports_received = true;
+  go_next = true;
+}
+
 
 private void prepareExitHandler () {
   Runtime.getRuntime().addShutdownHook(new Thread(new Runnable() {
@@ -147,7 +171,10 @@ private void prepareExitHandler () {
       // application exit code here
       OscMessage msg = new OscMessage("/setup_req");
       msg.add("stop");
-      oscP5.send(msg, first_osc);
+      
+      for (int i = 0; i < num_oscillators; i++){
+        oscP5.send(msg, new NetAddress("localhost", ports[i]));
+      }
     }
   }));
 }

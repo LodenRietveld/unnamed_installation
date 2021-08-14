@@ -11,7 +11,7 @@ class InternalOscData {
 	1 => int num_voices;
 	1 => int num_osc;
 	0.05 => float detune;
-	0 => int arpeggiating;
+	1 => int arpeggiating;
 }
 
 0 => int DEBUG;
@@ -271,12 +271,40 @@ fun void update_pitch(){
 }
 
 fun void switch_arpeggiating(){
+	1 - iod.arpeggiating => iod.arpeggiating;
 
+	if (iod.arpeggiating){
+		arpeggio_switch_event.signal();
+	}
 }
+
+
+
+fun void arpeggiate(){
+	while(1){
+		if (iod.arpeggiating){
+			for (int i; i < iod.num_notes; i++){
+				env[i].keyOn();
+			}
+
+			dna.get(dna.ATTACK)::ms => now;
+
+			for (int i; i < iod.num_notes; i++){
+				env[i].keyOn();
+			}
+
+			dna.get(dna.RELEASE)::ms => now;
+		} else {
+			arpeggio_switch_event => now;
+		}
+	}
+}
+
 
 fun void handle_env_msg(){
 	int note_idx;
-	1 => int once;
+	0 => int note_on;
+
 	while (true){
 		env_event => now;
 		while(env_event.nextMsg() != 0){
@@ -294,21 +322,33 @@ fun void handle_env_msg(){
 				env[(note_idx * iod.num_voices) + i].keyOff();
 				env[(note_idx * iod.num_voices) + i].keyOn();
 			}
+
+			1 => note_on;
 		} else if (note_idx == -2){
 			for (0 => int i; i < iod.num_notes; i++){
 				env[i].keyOff();
 				env[i].keyOn();
 			}
+
+			1 => note_on;
 		} else if (note_idx == 420){
 			for (0 => int i; i < iod.num_notes; i++){
 				env[i].keyOff();
+			}
+
+			0 => note_on;
+		}
+
+		if (note_on) {
+			if (Math.random2f(0., 1.) > 0.015){
+
+				/* switch_arpeggiating(); */
 			}
 		}
 
 		if (iod.num_other_entities > 0){
 			spork ~ cascade_env_msg(note_idx, Math.random2f(total_env_time / 2, total_env_time / 2));
 		}
-
 	}
 }
 
@@ -327,13 +367,6 @@ fun int[] unique_random_order(int length, int array[]){
 	return array;
 }
 
-fun void arp_off(float delay_time){
-	for (int i; i < iod.num_notes; i++){
-		env[i].keyOff();
-		delay_time::ms => now;
-	}
-}
-
 fun void cascade_env_msg(int note_idx, float delay){
 	int order[iod.num_notes];
 
@@ -349,7 +382,7 @@ fun void cascade_env_msg(int note_idx, float delay){
 	if (slow_off){
 		delay / delay_step => float delay_part;
 		(delay_part * (delay_step - 1))::ms => now;
-		spork ~ arp_off(delay_part / iod.num_notes);
+		spork ~ delayed_off(delay_part / iod.num_notes);
 	} else {
 		delay::ms => now;
 	}
@@ -374,11 +407,24 @@ fun void cascade_env_msg(int note_idx, float delay){
 }
 
 
+
+fun void delayed_off(float delay_time){
+	for (int i; i < iod.num_notes; i++){
+		env[i].keyOff();
+		delay_time::ms => now;
+	}
+}
+
+
 fun void dna_to_visualizer(){
 	float norm_dna[dna.number_of_parameters];
 
+	(iod.index * 50)::ms => now;
+
 	while(1){
 		if (send_to_visualizer){
+			take_lock(visualizer_lock);
+
 			visualizer.startMsg(visualizer_string);
 			visualizer.addInt(iod.index);
 
@@ -387,6 +433,8 @@ fun void dna_to_visualizer(){
 			for (int i; i < dna.number_of_parameters; i++){
 				visualizer.addFloat(norm_dna[i]);
 			}
+
+			release_lock(visualizer_lock);
 
 			100::ms => now;
 		} else {
@@ -422,7 +470,6 @@ fun void visualizer_setup(){
 				take_lock(visualizer_lock);
 
 				<<< "Sending names setup" >>>;
-
 				<<< "TypeTag: " + dna.get_name_typetag("/setup_req,s") >>>;
 
 				visualizer.startMsg(dna.get_name_typetag("/setup_req,s"));
@@ -431,6 +478,20 @@ fun void visualizer_setup(){
 				for (int i; i < dna.number_of_parameters; i++){
 					visualizer.addString(names[i]);
 					<<< "Adding name: " + names[i] >>>;
+				}
+
+				release_lock(visualizer_lock);
+			} else if (msg == "ports"){
+				take_lock(visualizer_lock);
+
+				<<< "Sending port info" >>>;
+				<<< "TypeTag: " + "/setup_req,s" + get_repeat_int_typetag(iod.num_other_entities+1) >>>;
+
+				visualizer.startMsg("/setup_req,s" + get_repeat_int_typetag(iod.num_other_entities+1));
+				visualizer.addString("ports");
+
+				for (int i; i < iod.num_other_entities+1; i++){
+					visualizer.addInt(iod.port_offset + i);
 				}
 
 				release_lock(visualizer_lock);
@@ -447,29 +508,6 @@ fun void visualizer_setup(){
 			} else if (msg == "stop"){
 				0 => send_to_visualizer;
 			}
-
-
-		}
-	}
-}
-
-
-fun void arpeggiate(){
-	while(1){
-		if (iod.arpeggiating){
-			for (int i; i < iod.num_notes; i++){
-				env[i].keyOn();
-			}
-
-			dna.get(dna.ATTACK)::ms => now;
-
-			for (int i; i < iod.num_notes; i++){
-				env[i].keyOn();
-			}
-
-			dna.get(dna.RELEASE)::ms => now;
-		} else {
-			arpeggio_switch_event => now;
 		}
 	}
 }
@@ -512,6 +550,16 @@ fun void start_envs(){
 	for (0 => int i; i < iod.num_osc; i++){
 		1 => env[i].keyOn;
 	}
+}
+
+fun string get_repeat_int_typetag(int number){
+	string typetag;
+
+	for (int i; i < number; i++){
+		",i" +=> typetag;
+	}
+
+	return typetag;
 }
 
 spork ~ handle_env_msg();
