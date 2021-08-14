@@ -461,13 +461,13 @@ fun void arpeggiate(){
 				env[i].keyOn();
 			}
 
-			dna.get(ATTACK)::ms => now;
+			dna.get(dna.ATTACK)::ms => now;
 
 			for (int i; i < iod.num_notes; i++){
 				env[i].keyOn();
 			}
 
-			dna.get(RELEASE)::ms => now;
+			dna.get(dna.RELEASE)::ms => now;
 		} else {
 			arpeggio_switch_event => now;
 		}
