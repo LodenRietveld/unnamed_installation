@@ -15,7 +15,7 @@ class InternalOscData {
 }
 
 0 => int DEBUG;
-1 => int DEBUG_ON;
+0 => int DEBUG_ON;
 
 InternalOscData iod;
 OscRecv osc_in;
@@ -440,7 +440,6 @@ fun void dna_to_visualizer(){
 		} else {
 			visualizer_wait_event => now;
 		}
-
 	}
 }
 
@@ -448,17 +447,17 @@ fun void visualizer_setup(){
 	while(1){
 		visualizer_setup_event => now;
 
-		<<< "woken up" >>>;
-
 		while(visualizer_setup_event.nextMsg() != 0){
 			visualizer_setup_event.getString() => string msg;
 			if (msg == "ints"){
 				take_lock(visualizer_lock);
 
-				<<< "Sending ints setup" >>>;
-				<<< "TypeTag: /setup_req,s,i,i" >>>;
-				<<< "Adding ints: " + Std.itoa(iod.num_other_entities + 1) >>>;
-				<<< "Adding ints: " + Std.itoa(dna.number_of_parameters) >>>;
+				if (DEBUG){
+					<<< "Sending ints setup" >>>;
+					<<< "TypeTag: /setup_req,s,i,i" >>>;
+					<<< "Adding ints: " + Std.itoa(iod.num_other_entities + 1) >>>;
+					<<< "Adding ints: " + Std.itoa(dna.number_of_parameters) >>>;
+				}
 
 				visualizer.startMsg("/setup_req,s,i,i");
 				visualizer.addString("ints");
@@ -469,23 +468,28 @@ fun void visualizer_setup(){
 			} else if (msg == "names"){
 				take_lock(visualizer_lock);
 
-				<<< "Sending names setup" >>>;
-				<<< "TypeTag: " + dna.get_name_typetag("/setup_req,s") >>>;
+				if (DEBUG){
+					<<< "Sending names setup" >>>;
+					<<< "TypeTag: " + dna.get_name_typetag("/setup_req,s") >>>;
+				}
 
 				visualizer.startMsg(dna.get_name_typetag("/setup_req,s"));
 				visualizer.addString("names");
 				dna.get_names() @=> string names[];
 				for (int i; i < dna.number_of_parameters; i++){
 					visualizer.addString(names[i]);
-					<<< "Adding name: " + names[i] >>>;
+
+					if (DEBUG) <<< "Adding name: " + names[i] >>>;
 				}
 
 				release_lock(visualizer_lock);
 			} else if (msg == "ports"){
 				take_lock(visualizer_lock);
 
-				<<< "Sending port info" >>>;
-				<<< "TypeTag: " + "/setup_req,s" + get_repeat_int_typetag(iod.num_other_entities+1) >>>;
+				if (DEBUG){
+					<<< "Sending port info" >>>;
+					<<< "TypeTag: " + "/setup_req,s" + get_repeat_int_typetag(iod.num_other_entities+1) >>>;
+				}
 
 				visualizer.startMsg("/setup_req,s" + get_repeat_int_typetag(iod.num_other_entities+1));
 				visualizer.addString("ports");

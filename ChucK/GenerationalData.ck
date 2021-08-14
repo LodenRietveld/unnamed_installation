@@ -11,7 +11,7 @@ public class GenerationalData {
 
 	GenerationalMetaData gmd;
 
-	0.0015 => float start_random_mutation_thresh;
+	0.006 => float start_random_mutation_thresh;
 
 	9 => int number_of_parameters;
 	.1::second => dur mutate_speed;
@@ -21,6 +21,7 @@ public class GenerationalData {
 	(history_length - 1) / history_length => float history_value_weight;
 	1. - history_value_weight => float new_value_weight;
 
+	//TODO: This is now measured across all parameters, should probably be measured across entities?
 	float diff_history_avg[number_of_parameters];
 
 	GenerationalDataPoint data[number_of_parameters];
@@ -115,6 +116,7 @@ public class GenerationalData {
 		for (int i; i < number_of_parameters; i++){
 			sum + diff_history_avg[i] => sum;
 		}
+
 		return sum / number_of_parameters < start_random_mutation_thresh;
 	}
 
@@ -164,7 +166,7 @@ public class GenerationalData {
 		for (int i; i < number_of_parameters; i++){
 			data[i].get_name() => param_names[i];
 		}
-		
+
 		return param_names;
 	}
 
