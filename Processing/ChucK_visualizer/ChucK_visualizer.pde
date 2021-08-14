@@ -33,8 +33,6 @@ void setup(){
   
   rg = new RG();
   rg.init(this);
-  good_font = rg.loadFont("AppleGothic.ttf");
-  rg.textFont(good_font, 15);
   
   for (int i = 0; i < num_values_per_oscillator; i++){
     vals[i] = new OscillatorValues(num_oscillators, section_width, section_width * i);
