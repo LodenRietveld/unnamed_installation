@@ -1,5 +1,5 @@
 public class GenerationalData {
-	1 => int DEBUG;
+	0 => int DEBUG;
 
 	0 => int ATTACK;
 	1 => int DECAY;
@@ -24,11 +24,12 @@ public class GenerationalData {
 	(history_length - 1) / history_length => float history_value_weight;
 	1. - history_value_weight => float new_value_weight;
 
-	//TODO: This is now measured across all parameters, should probably be measured across entities?
 	float diff_history_avg[number_of_parameters];
 
 	int mutating_to_random;
 	float target_dna[number_of_parameters];
+	float value_start_and_distance_to_target[number_of_parameters][2];
+
 	GenerationalDataPoint data[number_of_parameters];
 	float normalized_array[number_of_parameters];
 	float normalized_scaled_array[number_of_parameters];
@@ -85,6 +86,9 @@ public class GenerationalData {
 	fun void mutate_param_target(int idx){
 		if (idx > -1 && idx < number_of_parameters){
 			data[idx].mutate_get_value(gmd.random_influence_range) => target_dna[idx];
+
+ 			data[idx].get_value() => value_start_and_distance_to_target[idx][0];
+			target_dna[idx] - value_start_and_distance_to_target[idx][0] => value_start_and_distance_to_target[idx][1];
 		}
 	}
 
@@ -142,12 +146,13 @@ public class GenerationalData {
 		}
 
 		sum / number_of_parameters => float difference;
+		average_target_current_difference() => float target_current_diff;
 
 		difference < start_random_mutation_thresh => int should_mutate;
-		(difference > stop_random_mutation_thresh) => int should_stop_mutate;
+		target_current_diff < stop_random_mutation_thresh => int should_stop_mutate;
 
 		if (DEBUG){
-			<<< "Mutating to random: " + Std.itoa(mutating_to_random) + ", should_stop_mutate: " + Std.itoa(should_stop_mutate) + ", should_mutate: " + Std.itoa(should_mutate) + ", difference: " + Std.ftoa(difference, 5)>>>;
+			<<< "Mutating to random: " + Std.itoa(mutating_to_random) + ", should_stop_mutate: " + Std.itoa(should_stop_mutate) + ", should_mutate: " + Std.itoa(should_mutate) + ", target_current_diff: " + Std.ftoa(target_current_diff, 5)>>>;
 		}
  		if (mutating_to_random) {
 			if (should_stop_mutate) 0 => mutating_to_random;
@@ -163,6 +168,17 @@ public class GenerationalData {
 		float bounds[3];
 		data[index].get_bounds() @=> bounds;
 		return ((_new - old) - bounds[0]) / bounds[1];
+	}
+
+	fun float average_target_current_difference(){
+		float sum;
+
+		for (int i; i < number_of_parameters; i++){
+			if (value_start_and_distance_to_target[i][1] == 0) continue;
+			Math.fabs((data[i].get_value() - value_start_and_distance_to_target[i][0]) / value_start_and_distance_to_target[i][1]) +=> sum;
+		}
+
+		return sum / number_of_parameters;
 	}
 
 	fun void print_all(){
