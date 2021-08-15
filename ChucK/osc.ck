@@ -57,6 +57,7 @@ if (me.args() == 5){
 
 GenerationalData dna;
 dna.generate_osc_string() => string dna_string;
+dna.init_data_points(iod.num_other_entities+1);
 
 (iod.index == 0) => int is_main;
 
@@ -128,6 +129,7 @@ osc_in.event("/setup_req,s") @=> OscEvent visualizer_setup_event;
 
 fun void process_dna_event(){
 	int idx;
+	int sender_index;
 	float values[dna.number_of_parameters];
 
 	while(true){
@@ -141,10 +143,10 @@ fun void process_dna_event(){
 			}
 
 			//pop off value used to determine timing:
-			dna_event.getInt();
+			dna_event.getInt() => sender_index;
 		}
 
-		dna.mutate_towards(values);
+		dna.set_mutation_target(values, sender_index);
 
 		if (DEBUG && is_main){
 			<<< "Received DNA message at " + Std.itoa(iod.port_in) >>>;
@@ -152,6 +154,18 @@ fun void process_dna_event(){
 		}
 
 		spork ~ apply_dna_change_and_mutate_other();
+	}
+}
+
+
+fun void dna_mutation(){
+	while(1){
+		dna.mutate_step();
+		for (int i; i < dna.number_of_parameters; i++){
+			dna.get_scaled(i) => float scaled;
+			apply_dna(i, scaled);
+		}
+		16::ms => now;
 	}
 }
 
@@ -180,7 +194,7 @@ fun void apply_dna_change_and_mutate_other(){
 		osc_target.addFloat(dna.get(i));
 	}
 
-	osc_target.addInt(0);
+	osc_target.addInt(iod.index);
 	release_lock(target);
 }
 
@@ -353,7 +367,7 @@ fun void handle_env_msg(){
 		}
 
 		if (iod.num_other_entities > 0){
-			spork ~ cascade_env_msg(note_idx, Math.random2f(total_env_time / 2, total_env_time / 2));
+			spork ~ cascade_env_msg(note_idx, Math.random2f(total_env_time, total_env_time * 4));
 		}
 	}
 }
@@ -588,6 +602,7 @@ spork ~ process_dna_event();
 spork ~ dna_to_visualizer();
 spork ~ visualizer_setup();
 spork ~ arpeggiate();
+spork ~ dna_mutation();
 
 set_notes(notes, saw);
 set_notes(notes, sqr);

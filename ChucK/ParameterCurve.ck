@@ -14,6 +14,12 @@ public class ParameterCurve {
     };
 
     fun float curve_value(float normalized_value_in){
+        if (normalized_value_in < 0){
+            0 => normalized_value_in;
+        } else if (normalized_value_in >= 1){
+            0.99999999 => normalized_value_in;
+        }
+
         return curve[Math.floor(normalized_value_in * resolution) $ int];
     }
 }

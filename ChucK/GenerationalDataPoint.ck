@@ -1,5 +1,9 @@
 public class GenerationalDataPoint {
     Float value;
+    float all_entity_values[];
+    int num_entities;
+    float average_entity_value;
+    float entity_value_variance;
     Vector bounds;
     ParameterCurve @ p;
     int has_curve;
@@ -11,6 +15,7 @@ public class GenerationalDataPoint {
         set_bound_range();
         pc @=> p;
         1 => has_curve;
+        set_other_entity_number(num_entities);
     }
 
     fun void init(string name, float min, float max){
@@ -18,6 +23,43 @@ public class GenerationalDataPoint {
         set_bounds(min, max);
         set_bound_range();
         0 => has_curve;
+        set_other_entity_number(num_entities);
+    }
+
+    fun void set_other_entity_number(int num_entities){
+        num_entities => this.num_entities;
+        new float[num_entities] @=> all_entity_values;
+    }
+
+    fun void set_other_entity_value(int i, float value){
+        if (i < num_entities && i >= 0){
+            value => all_entity_values[i];
+            update_average_entity_value();
+            calculate_variance();
+        }
+    }
+
+    fun float get_variance(){
+        return entity_value_variance;
+    }
+
+    fun void update_average_entity_value(){
+        0 => average_entity_value;
+        for (int i; i < num_entities; i++){
+            all_entity_values[i] +=> average_entity_value;
+        }
+
+        num_entities /=> average_entity_value;
+    }
+
+    fun void calculate_variance(){
+        float var_sum;
+
+        for (int i; i < num_entities; i++){
+            Math.pow(all_entity_values[i] - average_entity_value, 2) +=> var_sum;
+        }
+
+        var_sum / num_entities => entity_value_variance;
     }
 
     fun float get_scaled_value(){
@@ -66,10 +108,10 @@ public class GenerationalDataPoint {
         }
     }
 
-    fun void mutate_set_value(float mutate_range){
+    fun float mutate_get_value(float mutate_range){
         value.val + (bounds.z * Math.random2f(-mutate_range, mutate_range)) => float new_value;
 
-        set_value(new_value);
+        return new_value;
     }
 
     fun void set_bound_range(){

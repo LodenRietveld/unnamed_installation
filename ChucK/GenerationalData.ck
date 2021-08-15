@@ -1,4 +1,6 @@
 public class GenerationalData {
+	1 => int DEBUG;
+
 	0 => int ATTACK;
 	1 => int DECAY;
 	2 => int SUSTAIN;
@@ -12,6 +14,7 @@ public class GenerationalData {
 	GenerationalMetaData gmd;
 
 	0.006 => float start_random_mutation_thresh;
+	0.03 => float stop_random_mutation_thresh;
 
 	9 => int number_of_parameters;
 	.1::second => dur mutate_speed;
@@ -24,6 +27,8 @@ public class GenerationalData {
 	//TODO: This is now measured across all parameters, should probably be measured across entities?
 	float diff_history_avg[number_of_parameters];
 
+	int mutating_to_random;
+	float target_dna[number_of_parameters];
 	GenerationalDataPoint data[number_of_parameters];
 	float normalized_array[number_of_parameters];
 	float normalized_scaled_array[number_of_parameters];
@@ -54,7 +59,7 @@ public class GenerationalData {
 			out + ", f" => out;
 		}
 
-		//use this final integer to control when to send the message
+		//use this final integer to indicate index
 		out + ",i" => out;
 
 		return out;
@@ -77,10 +82,9 @@ public class GenerationalData {
 		}
 	}
 
-	fun void mutate_param(int idx){
+	fun void mutate_param_target(int idx){
 		if (idx > -1 && idx < number_of_parameters){
-			data[idx].mutate_set_value(gmd.random_influence_range);
-			update_normalized_array(idx);
+			data[idx].mutate_get_value(gmd.random_influence_range) => target_dna[idx];
 		}
 	}
 
@@ -98,19 +102,30 @@ public class GenerationalData {
 					1 => mutated[idx];
 				}
 
-				mutate_param(idx);
+				mutate_param_target(idx);
 				mutate_count--;
 			}
 
 			(idx + 1) % number_of_parameters => idx;
 		}
+
+		1 => mutating_to_random;
 	}
 
-	fun void mutate_towards(float other_parameters[]){
+	fun void set_mutation_target(float other_parameters[], int sender_index){
+		if (!mutating_to_random) {
+			other_parameters @=> target_dna;
+			for (int i; i < number_of_parameters; i++){
+				data[i].set_other_entity_value(sender_index, other_parameters[i]);
+			}
+		}
+	}
+
+	fun void mutate_step(){
 		for (int i; i < number_of_parameters; i++){
-			other_parameters[i] => float other_parameter_val;
+			target_dna[i] => float other_parameter_val;
 			data[i].get_value() => float old_param_val;
-			(gmd.other_influence_range * other_parameter_val) + ((1. - gmd.other_influence_range) *  old_param_val) => float new_param_val;
+			(gmd.other_influence_range_step * other_parameter_val) + ((1. - gmd.other_influence_range_step) *  old_param_val) => float new_param_val;
 
 			data[i].set_value(new_param_val);
 			update_normalized_array(i);
@@ -126,7 +141,22 @@ public class GenerationalData {
 			sum + diff_history_avg[i] => sum;
 		}
 
-		return sum / number_of_parameters < start_random_mutation_thresh;
+		sum / number_of_parameters => float difference;
+
+		difference < start_random_mutation_thresh => int should_mutate;
+		(difference > stop_random_mutation_thresh) => int should_stop_mutate;
+
+		if (DEBUG){
+			<<< "Mutating to random: " + Std.itoa(mutating_to_random) + ", should_stop_mutate: " + Std.itoa(should_stop_mutate) + ", should_mutate: " + Std.itoa(should_mutate) + ", difference: " + Std.ftoa(difference, 5)>>>;
+		}
+ 		if (mutating_to_random) {
+			if (should_stop_mutate) 0 => mutating_to_random;
+ 			return should_mutate;
+ 		}
+
+		if (should_mutate) 1 => mutating_to_random;
+
+		return should_mutate;
 	}
 
 	fun float difference_range(int index, float old, float _new){
@@ -185,6 +215,11 @@ public class GenerationalData {
 		return param_names;
 	}
 
+	fun void init_data_points(int number_entities){
+		for (int i; i < number_of_parameters; i++){
+			data[i].set_other_entity_number(number_entities);
+		}
+	}
 
 	fun void set_defaults(){
 		gmd.generate_param_curve(number_of_parameters);
@@ -204,6 +239,8 @@ public class GenerationalData {
 
 	fun void initialize_to_random(){
 		for(int i; i < number_of_parameters; i++){
+			data[i].set_random();
+			data[i].get_value() => target_dna[i];
 			data[i].set_random();
 		}
 	}
